@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faceit Elo Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: "Roboto", sans-serif;
+      background: transparent;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #background {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(20px);
+      z-index: -1;
+      border-radius: 20px;
+      opacity: 0;
+      transition: opacity 2s ease;
+    }
+
+    #avatar {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 20px;
+      opacity: 0;
+      animation: fadeIn 1.5s forwards;
+    }
+
+    #avatar img {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 0 15px rgba(255, 255, 255, 0.6);
+    }
+
+    #nickname {
+      margin-top: 10px;
+      font-size: 2rem;
+      font-weight: bold;
+      text-shadow: 0 2px 10px rgba(255, 255, 255, 0.5);
+    }
+
+    #elo-change {
+      font-size: 4rem;
+      font-weight: bold;
+      display: none;
+      opacity: 0;
+      transition: opacity 2s ease, transform 0.5s ease;
+      text-shadow: 0 0 10px #fff, 0 0 20px #00ff00;
+    }
+
+    #win-or-lose {
+      font-size: 5rem;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin-top: 20px;
+      display: none;
+      opacity: 0;
+      animation: fadeInScale 1.5s forwards;
+    }
+
+    .win {
+      color: #00ff00;
+      text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
+    }
+
+    .lose {
+      color: #ff4d4d;
+      text-shadow: 0 0 10px #ff4d4d, 0 0 20px #ff4d4d;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes fadeInScale {
+      from { opacity: 0; transform: scale(0.8); }
+      to { opacity: 1; transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <div id="background"></div>
+  <div id="avatar">
+    <img id="avatar-img" src="https://via.placeholder.com/120" alt="Avatar">
+    <div id="nickname">ZHOSKIY_</div>
+  </div>
+  <div id="win-or-lose"></div>
+  <div id="elo-change"></div>
+
+  <script>
+    const apiKey = "73263a7f-7374-459e-ac57-e7f4ddf4db97"; // Ваш API-ключ
+    const nickname = "ZHOSKIY_"; // Ваш ник на Faceit
+
+    async function fetchPlayerData() {
+      try {
+        const response = await fetch(`https://open.faceit.com/data/v4/players?nickname=${nickname}`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Ошибка: ${response.status}. ${errorText}`);
+          return;
+        }
+
+        const data = await response.json();
+        const elo = data.games.cs2.faceit_elo;
+
+        const avatarImg = document.getElementById("avatar-img");
+        avatarImg.src = data.avatar;
+        const nicknameElement = document.getElementById("nickname");
+        nicknameElement.textContent = nickname;
+
+        const previousElo = localStorage.getItem("previousElo");
+
+        if (previousElo === null || Number(previousElo) !== elo) {
+          animateEloChange(Number(previousElo || elo), elo);
+          localStorage.setItem("previousElo", elo);
+        }
+      } catch (error) {
+        console.error("Ошибка:", error);
+      }
+    }
+
+    function animateEloChange(oldElo, newElo) {
+      const eloChangeElement = document.getElementById("elo-change");
+      const winOrLoseElement = document.getElementById("win-or-lose");
+      const avatarElement = document.getElementById("avatar");
+      const backgroundElement = document.getElementById("background");
+
+      const isVictory = newElo > oldElo;
+      winOrLoseElement.textContent = isVictory ? "Winner" : "Lose";
+      winOrLoseElement.className = isVictory ? "win" : "lose";
+      winOrLoseElement.style.display = "block";
+
+      avatarElement.style.display = "flex";
+      backgroundElement.style.opacity = 1;
+
+      const step = (newElo - oldElo) / 100;
+      let currentElo = oldElo;
+
+      function updateElo() {
+        if ((step > 0 && currentElo < newElo) || (step < 0 && currentElo > newElo)) {
+          currentElo += step;
+          eloChangeElement.textContent = `ELO: ${Math.round(currentElo)}`;
+          requestAnimationFrame(updateElo);
+        } else {
+          eloChangeElement.textContent = `ELO: ${newElo}`;
+        }
+      }
+
+      setTimeout(() => {
+        eloChangeElement.style.display = "block";
+        eloChangeElement.style.opacity = 1;
+        updateElo();
+      }, 500);
+
+      setTimeout(() => {
+        winOrLoseElement.style.opacity = 0;
+        eloChangeElement.style.opacity = 0;
+        avatarElement.style.opacity = 0;
+        backgroundElement.style.opacity = 0;
+
+        setTimeout(() => {
+          winOrLoseElement.style.display = "none";
+          eloChangeElement.style.display = "none";
+          avatarElement.style.display = "none";
+        }, 2000);
+      }, 5000);
+    }
+
+    setInterval(fetchPlayerData, 5000); // Проверяем каждые 5 секунд
+  </script>
+</body>
+</html>
